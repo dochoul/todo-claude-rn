@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, StyleSheet,
-  Alert, Platform,
+  // Alert: iOS/Android 네이티브 다이얼로그 (웹의 window.confirm과 유사)
+  Alert,
+  Platform,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
@@ -15,12 +17,15 @@ interface Props {
   todo: Todo;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
+  // Partial<Pick<...>>: Todo의 특정 필드만 선택적으로 업데이트
   onUpdate: (id: string, updates: Partial<Pick<Todo, 'text' | 'category' | 'priority' | 'dueDate'>>) => void;
   theme: Theme;
 }
 
 export function TodoItem({ todo, onToggle, onDelete, onUpdate, theme }: Props) {
+  // editing: 보기 모드(false) ↔ 수정 모드(true) 전환
   const [editing, setEditing] = useState(false);
+  // 수정 중인 임시 값들 (저장 전까지 원본에 반영되지 않음)
   const [editText, setEditText] = useState(todo.text);
   const [editCategory, setEditCategory] = useState(todo.category);
   const [editPriority, setEditPriority] = useState(todo.priority);
@@ -30,37 +35,48 @@ export function TodoItem({ todo, onToggle, onDelete, onUpdate, theme }: Props) {
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const colors = theme === 'dark' ? darkColors : lightColors;
-  const dueDateStatus = getDueDateStatus(todo.dueDate);
+  const dueDateStatus = getDueDateStatus(todo.dueDate); // 'far' | 'soon' | 'today' | 'overdue' | null
   const priorityColor = PRIORITY_COLORS[todo.priority];
 
+  // 수정 저장
   function handleSave() {
     if (!editText.trim()) return;
     onUpdate(todo.id, {
       text: editText.trim(),
       category: editCategory,
       priority: editPriority,
-      dueDate: editDueDate ? toMidnightTimestamp(timestampToDateStr(editDueDate.getTime())) : undefined,
+      dueDate: editDueDate
+        ? toMidnightTimestamp(timestampToDateStr(editDueDate.getTime()))
+        : undefined,
     });
     setEditing(false);
   }
 
+  // 삭제 확인 다이얼로그
   function handleDelete() {
+    // Alert.alert: 네이티브 확인 다이얼로그 (웹의 window.confirm 대체)
+    // 버튼 배열: 취소(cancel), 삭제(destructive - iOS에서 빨간색으로 표시)
     Alert.alert('삭제 확인', `"${todo.text}" 를 삭제할까요?`, [
       { text: '취소', style: 'cancel' },
       { text: '삭제', style: 'destructive', onPress: () => onDelete(todo.id) },
     ]);
   }
 
+  // D-Day 상태에 따른 배지 색상
   const dueDateBadgeColor = {
-    far: '#9E9E9E',
-    soon: '#FF9800',
-    today: '#F44336',
-    overdue: '#B71C1C',
+    far: '#9E9E9E',      // 3일 이상: 회색
+    soon: '#FF9800',     // 1~2일: 주황
+    today: '#F44336',    // 오늘: 빨강
+    overdue: '#B71C1C',  // 기한 초과: 진한 빨강
   }[dueDateStatus ?? 'far'] ?? '#9E9E9E';
 
+  // ─────────────────────────────────────────
+  // 수정 모드 UI
+  // ─────────────────────────────────────────
   if (editing) {
     return (
       <View style={[styles.card, { backgroundColor: colors.cardBg, borderLeftColor: priorityColor }]}>
+        {/* multiline: 여러 줄 입력 가능, autoFocus: 편집 모드 진입 시 자동으로 포커스 */}
         <TextInput
           style={[styles.editInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.inputBg }]}
           value={editText}
@@ -69,14 +85,18 @@ export function TodoItem({ todo, onToggle, onDelete, onUpdate, theme }: Props) {
           multiline
         />
 
-        {/* Category picker */}
+        {/* 카테고리 선택 */}
         <View style={styles.pickerRow}>
           <Text style={[styles.pickerLabel, { color: colors.subText }]}>카테고리</Text>
           <View style={styles.chips}>
             {CATEGORIES.map((c) => (
               <TouchableOpacity
                 key={c}
-                style={[styles.miniChip, { borderColor: CATEGORY_COLORS[c] }, editCategory === c && { backgroundColor: CATEGORY_COLORS[c] }]}
+                style={[
+                  styles.miniChip,
+                  { borderColor: CATEGORY_COLORS[c] },
+                  editCategory === c && { backgroundColor: CATEGORY_COLORS[c] },
+                ]}
                 onPress={() => setEditCategory(c)}
               >
                 <Text style={[styles.miniChipText, editCategory === c && { color: '#FFF' }]}>{c}</Text>
@@ -85,23 +105,29 @@ export function TodoItem({ todo, onToggle, onDelete, onUpdate, theme }: Props) {
           </View>
         </View>
 
-        {/* Priority picker */}
+        {/* 우선순위 선택 */}
         <View style={styles.pickerRow}>
           <Text style={[styles.pickerLabel, { color: colors.subText }]}>우선순위</Text>
           <View style={styles.chips}>
             {PRIORITIES.map((p) => (
               <TouchableOpacity
                 key={p}
-                style={[styles.miniChip, { borderColor: PRIORITY_COLORS[p] }, editPriority === p && { backgroundColor: PRIORITY_COLORS[p] }]}
+                style={[
+                  styles.miniChip,
+                  { borderColor: PRIORITY_COLORS[p] },
+                  editPriority === p && { backgroundColor: PRIORITY_COLORS[p] },
+                ]}
                 onPress={() => setEditPriority(p)}
               >
-                <Text style={[styles.miniChipText, editPriority === p && { color: '#FFF' }]}>{PRIORITY_ICONS[p]} {p}</Text>
+                <Text style={[styles.miniChipText, editPriority === p && { color: '#FFF' }]}>
+                  {PRIORITY_ICONS[p]} {p}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
 
-        {/* Due date */}
+        {/* 마감일 선택 */}
         <View style={styles.pickerRow}>
           <Text style={[styles.pickerLabel, { color: colors.subText }]}>마감일</Text>
           <View style={styles.chips}>
@@ -136,6 +162,7 @@ export function TodoItem({ todo, onToggle, onDelete, onUpdate, theme }: Props) {
           />
         )}
 
+        {/* 저장 / 취소 버튼 */}
         <View style={styles.editActions}>
           <TouchableOpacity
             style={[styles.actionBtn, { backgroundColor: '#6200EE' }]}
@@ -154,38 +181,72 @@ export function TodoItem({ todo, onToggle, onDelete, onUpdate, theme }: Props) {
     );
   }
 
+  // ─────────────────────────────────────────
+  // 보기 모드 UI
+  // ─────────────────────────────────────────
   return (
+    // borderLeftWidth + borderLeftColor: 우선순위에 따라 카드 왼쪽에 색상 줄 표시
     <View style={[styles.card, { backgroundColor: colors.cardBg, borderLeftColor: priorityColor }]}>
       <View style={styles.row}>
+        {/* 체크박스 */}
         <TouchableOpacity onPress={() => onToggle(todo.id)} style={styles.checkbox}>
-          <View style={[styles.checkboxBox, { borderColor: colors.border }, todo.completed && styles.checkboxChecked]}>
+          <View style={[
+            styles.checkboxBox,
+            { borderColor: colors.border },
+            todo.completed && styles.checkboxChecked,
+          ]}>
             {todo.completed && <Text style={styles.checkmark}>✓</Text>}
           </View>
         </TouchableOpacity>
 
+        {/* 할일 내용 영역 */}
         <View style={styles.content}>
-          <Text style={[styles.todoText, { color: colors.text }, todo.completed && styles.todoTextDone]}>
+          <Text style={[
+            styles.todoText,
+            { color: colors.text },
+            // 완료된 할일: 취소선 + 투명도 낮춤
+            todo.completed && styles.todoTextDone,
+          ]}>
             {todo.text}
           </Text>
+
+          {/* 배지 영역 (D-Day, 우선순위, 카테고리) */}
           <View style={styles.badges}>
+            {/* 마감일 배지: 마감일이 있을 때만 표시 */}
             {todo.dueDate && (
               <View style={[styles.badge, { backgroundColor: dueDateBadgeColor }]}>
                 <Text style={styles.badgeText}>{formatDueDateLabel(todo.dueDate)}</Text>
               </View>
             )}
-            <View style={[styles.badge, { backgroundColor: PRIORITY_COLORS[todo.priority] + '22', borderWidth: 1, borderColor: PRIORITY_COLORS[todo.priority] }]}>
+            {/* 우선순위 배지: 색상 22는 hex 투명도(약 13%) */}
+            <View style={[styles.badge, {
+              backgroundColor: PRIORITY_COLORS[todo.priority] + '22',
+              borderWidth: 1,
+              borderColor: PRIORITY_COLORS[todo.priority],
+            }]}>
               <Text style={[styles.badgeText, { color: PRIORITY_COLORS[todo.priority] }]}>
                 {PRIORITY_ICONS[todo.priority]} {todo.priority}
               </Text>
             </View>
-            <View style={[styles.badge, { backgroundColor: CATEGORY_COLORS[todo.category] + '22', borderWidth: 1, borderColor: CATEGORY_COLORS[todo.category] }]}>
-              <Text style={[styles.badgeText, { color: CATEGORY_COLORS[todo.category] }]}>{todo.category}</Text>
+            {/* 카테고리 배지 */}
+            <View style={[styles.badge, {
+              backgroundColor: CATEGORY_COLORS[todo.category] + '22',
+              borderWidth: 1,
+              borderColor: CATEGORY_COLORS[todo.category],
+            }]}>
+              <Text style={[styles.badgeText, { color: CATEGORY_COLORS[todo.category] }]}>
+                {todo.category}
+              </Text>
             </View>
           </View>
         </View>
 
+        {/* 편집/삭제 버튼 */}
         <View style={styles.actions}>
-          <TouchableOpacity onPress={() => { setEditing(true); setEditText(todo.text); }} style={styles.iconBtn}>
+          <TouchableOpacity
+            onPress={() => { setEditing(true); setEditText(todo.text); }}
+            style={styles.iconBtn}
+          >
             <Text style={{ fontSize: 16 }}>✏️</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={handleDelete} style={styles.iconBtn}>
@@ -221,7 +282,7 @@ const styles = StyleSheet.create({
     padding: 14,
     marginHorizontal: 16,
     marginVertical: 5,
-    borderLeftWidth: 4,
+    borderLeftWidth: 4,   // 우선순위 색상 줄
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
@@ -230,11 +291,11 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'flex-start', // 세로 기준 상단 정렬
     gap: 10,
   },
   checkbox: {
-    paddingTop: 2,
+    paddingTop: 2, // 텍스트와 수직 정렬 맞춤
   },
   checkboxBox: {
     width: 22,
@@ -254,7 +315,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   content: {
-    flex: 1,
+    flex: 1, // 체크박스와 버튼을 제외한 나머지 공간 모두 차지
     gap: 6,
   },
   todoText: {
@@ -263,7 +324,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   todoTextDone: {
-    textDecorationLine: 'line-through',
+    textDecorationLine: 'line-through', // 취소선
     opacity: 0.5,
   },
   badges: {
