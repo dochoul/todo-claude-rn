@@ -54,7 +54,14 @@ export function TodoItem({ todo, onToggle, onDelete, onUpdate, theme }: Props) {
 
   // 삭제 확인 다이얼로그
   function handleDelete() {
-    // Alert.alert: 네이티브 확인 다이얼로그 (웹의 window.confirm 대체)
+    // 웹에서는 Alert.alert 버튼 배열이 동작하지 않으므로 window.confirm 사용
+    if (Platform.OS === 'web') {
+      if (window.confirm(`"${todo.text}" 를 삭제할까요?`)) {
+        onDelete(todo.id);
+      }
+      return;
+    }
+    // Alert.alert: 네이티브 확인 다이얼로그
     // 버튼 배열: 취소(cancel), 삭제(destructive - iOS에서 빨간색으로 표시)
     Alert.alert('삭제 확인', `"${todo.text}" 를 삭제할까요?`, [
       { text: '취소', style: 'cancel' },
@@ -131,14 +138,38 @@ export function TodoItem({ todo, onToggle, onDelete, onUpdate, theme }: Props) {
         <View style={styles.pickerRow}>
           <Text style={[styles.pickerLabel, { color: colors.subText }]}>마감일</Text>
           <View style={styles.chips}>
-            <TouchableOpacity
-              style={[styles.miniChip, { borderColor: colors.border }]}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Text style={{ color: colors.text, fontSize: 13 }}>
-                {editDueDate ? timestampToDateStr(editDueDate.getTime()) : '날짜 선택'}
-              </Text>
-            </TouchableOpacity>
+            {Platform.OS === 'web' ? (
+              // 웹: <input type="date">를 칩 스타일로 직접 렌더링
+              <input
+                type="date"
+                value={editDueDate ? timestampToDateStr(editDueDate.getTime()) : ''}
+                min={timestampToDateStr(Date.now())}
+                onChange={(e) => {
+                  if (e.target.value) setEditDueDate(new Date(e.target.value + 'T00:00:00'));
+                }}
+                style={{
+                  border: `1px solid ${colors.border}`,
+                  borderRadius: 14,
+                  paddingLeft: 10,
+                  paddingRight: 10,
+                  paddingTop: 4,
+                  paddingBottom: 4,
+                  fontSize: 13,
+                  color: colors.text,
+                  backgroundColor: 'transparent',
+                  cursor: 'pointer',
+                }}
+              />
+            ) : (
+              <TouchableOpacity
+                style={[styles.miniChip, { borderColor: colors.border }]}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text style={{ color: colors.text, fontSize: 13 }}>
+                  {editDueDate ? timestampToDateStr(editDueDate.getTime()) : '날짜 선택'}
+                </Text>
+              </TouchableOpacity>
+            )}
             {editDueDate && (
               <TouchableOpacity
                 style={[styles.miniChip, { borderColor: '#F44336' }]}
@@ -150,7 +181,7 @@ export function TodoItem({ todo, onToggle, onDelete, onUpdate, theme }: Props) {
           </View>
         </View>
 
-        {showDatePicker && (
+        {Platform.OS !== 'web' && showDatePicker && (
           <DateTimePicker
             value={editDueDate ?? new Date()}
             mode="date"
